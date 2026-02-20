@@ -100,6 +100,12 @@ def maybe_download(url: str, *, force_download: bool = False, **kwargs) -> pathl
 
 def _download_fsspec(url: str, local_path: pathlib.Path, **kwargs) -> None:
     """Download a file from a remote filesystem to the local cache, and return the local path."""
+    # Let gcsfs's aiohttp session pick up HTTP_PROXY/HTTPS_PROXY env vars.
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme == "gs" and "gs" not in kwargs:
+        proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy")
+        if proxy:
+            kwargs["gs"] = {"session_kwargs": {"trust_env": True}}
     fs, _ = fsspec.core.url_to_fs(url, **kwargs)
     info = fs.info(url)
     # Folders are represented by 0-byte objects with a trailing forward slash.
@@ -114,6 +120,7 @@ def _download_fsspec(url: str, local_path: pathlib.Path, **kwargs) -> None:
             current_size = sum(f.stat().st_size for f in [*local_path.rglob("*"), local_path] if f.is_file())
             pbar.update(current_size - pbar.n)
             time.sleep(1)
+        future.result()
         pbar.update(total_size - pbar.n)
 
 
