@@ -1,10 +1,8 @@
-# Run with:
-# docker compose -f examples/aloha_sim/compose.yml up --build
+# Run with (remote server should already be running serve_policy.py):
+# REMOTE_HOST=<server_ip> docker compose -f examples/aloha_sim/compose.yml up --build
 services:
   runtime:
     image: aloha_sim
-    depends_on:
-      - openpi_server
     build:
       context: ../..
       dockerfile: examples/aloha_sim/Dockerfile
@@ -15,24 +13,9 @@ services:
     volumes:
       - $PWD:/app
       - ../../data:/data
-
-  openpi_server:
-    image: openpi_server
-    build:
-      context: ../..
-      dockerfile: scripts/docker/serve_policy.Dockerfile
-    init: true
-    tty: true
-    network_mode: host
-    volumes:
-      - $PWD:/app
-      - ${OPENPI_DATA_HOME:-~/.cache/openpi}:/openpi_assets
     environment:
-      - SERVER_ARGS
-      - OPENPI_DATA_HOME=/openpi_assets
-      - IS_DOCKER=true
-
-    # Comment out this block if not running on a machine with GPUs.
+      - REMOTE_HOST=${REMOTE_HOST:-0.0.0.0}
+      - REMOTE_PORT=${REMOTE_PORT:-8000}
     deploy:
       resources:
         reservations:
@@ -40,3 +23,6 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    command: >
+      bash -c "source /.venv/bin/activate &&
+      python examples/aloha_sim/main.py --args.host $${REMOTE_HOST} --args.port $${REMOTE_PORT}"
